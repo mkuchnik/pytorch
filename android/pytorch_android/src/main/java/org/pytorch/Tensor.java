@@ -19,9 +19,9 @@ public abstract class Tensor {
 
   private static final String ERROR_MSG_DATA_BUFFER_NOT_NULL = "Data buffer must be not null";
   private static final String ERROR_MSG_DATA_ARRAY_NOT_NULL = "Data array must be not null";
-  private static final String ERROR_MSG_SHAPE_NOT_NULL = "Dims must be not null";
-  private static final String ERROR_MSG_SHAPE_NOT_EMPTY = "Dims must be not empty";
-  private static final String ERROR_MSG_SHAPE_NON_NEGATIVE = "Dims must be non negative";
+  private static final String ERROR_MSG_SHAPE_NOT_NULL = "Shape must be not null";
+  private static final String ERROR_MSG_SHAPE_NOT_EMPTY = "Shape must be not empty";
+  private static final String ERROR_MSG_SHAPE_NON_NEGATIVE = "Shape elements must be non negative";
   private static final String ERROR_MSG_DATA_BUFFER_MUST_HAVE_NATIVE_BYTE_ORDER =
       "Data buffer must have native byte order (java.nio.ByteOrder#nativeOrder)";
   private static final String ERROR_MSG_DATA_BUFFER_MUST_BE_DIRECT =
@@ -62,7 +62,7 @@ public abstract class Tensor {
         .asDoubleBuffer();
   }
 
-  public static Tensor newTensor(long[] shape, byte[] data) {
+  public static Tensor newByteTensor(long[] shape, byte[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -72,7 +72,7 @@ public abstract class Tensor {
     return new Tensor_byte(byteBuffer, shape);
   }
 
-  public static Tensor newTensor(long[] shape, int[] data) {
+  public static Tensor newIntTensor(long[] shape, int[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -82,7 +82,7 @@ public abstract class Tensor {
     return new Tensor_int32(intBuffer, shape);
   }
 
-  public static Tensor newTensor(long[] shape, float[] data) {
+  public static Tensor newFloatTensor(long[] shape, float[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -92,7 +92,7 @@ public abstract class Tensor {
     return new Tensor_float32(floatBuffer, shape);
   }
 
-  public static Tensor newTensor(long[] shape, long[] data) {
+  public static Tensor newLongTensor(long[] shape, long[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -102,7 +102,7 @@ public abstract class Tensor {
     return new Tensor_long64(longBuffer, shape);
   }
 
-  public static Tensor newTensor(long[] shape, double[] data) {
+  public static Tensor newDoubleTensor(long[] shape, double[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -112,7 +112,7 @@ public abstract class Tensor {
     return new Tensor_double64(doubleBuffer, shape);
   }
 
-  public static Tensor newTensor(long[] shape, FloatBuffer data) {
+  public static Tensor newFloatTensor(long[] shape, FloatBuffer data) {
     checkArgument(data != null, ERROR_MSG_DATA_BUFFER_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -124,7 +124,7 @@ public abstract class Tensor {
     return new Tensor_float32(data, shape);
   }
 
-  public static Tensor newTensor(long[] shape, IntBuffer data) {
+  public static Tensor newIntTensor(long[] shape, IntBuffer data) {
     checkArgument(data != null, ERROR_MSG_DATA_BUFFER_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -136,7 +136,7 @@ public abstract class Tensor {
     return new Tensor_int32(data, shape);
   }
 
-  public static Tensor newTensor(long[] shape, ByteBuffer data) {
+  public static Tensor newByteTensor(long[] shape, ByteBuffer data) {
     checkArgument(data != null, ERROR_MSG_DATA_BUFFER_NOT_NULL);
     checkArgument(shape != null, ERROR_MSG_SHAPE_NOT_NULL);
     checkShape(shape);
@@ -153,11 +153,15 @@ public abstract class Tensor {
     this.shape = Arrays.copyOf(shape, shape.length);
   }
 
+  public long numel() {
+    return numel(this.shape);
+  }
+
   public static long numel(long[] shape) {
     checkShape(shape);
     int result = 1;
-    for (long dim : shape) {
-      result *= dim;
+    for (long s : shape) {
+      result *= s;
     }
     return result;
   }
@@ -197,8 +201,8 @@ public abstract class Tensor {
   static class Tensor_byte extends Tensor {
     private final ByteBuffer data;
 
-    private Tensor_byte(ByteBuffer data, long[] dims) {
-      super(dims);
+    private Tensor_byte(ByteBuffer data, long[] shape) {
+      super(shape);
       this.data = data;
     }
 
@@ -222,16 +226,15 @@ public abstract class Tensor {
 
     @Override
     public String toString() {
-      return String.format(
-          "Tensor_byte{shape:%s numel:%d}", Arrays.toString(shape), data.capacity());
+      return String.format("Tensor(%s, dtype=torch.int8)", Arrays.toString(shape));
     }
   }
 
   static class Tensor_int32 extends Tensor {
     private final IntBuffer data;
 
-    private Tensor_int32(IntBuffer data, long[] dims) {
-      super(dims);
+    private Tensor_int32(IntBuffer data, long[] shape) {
+      super(shape);
       this.data = data;
     }
 
@@ -255,16 +258,15 @@ public abstract class Tensor {
 
     @Override
     public String toString() {
-      return String.format(
-          "Tensor_int32{shape:%s numel:%d}", Arrays.toString(shape), data.capacity());
+      return String.format("Tensor(%s, dtype=torch.int32)", Arrays.toString(shape));
     }
   }
 
   static class Tensor_float32 extends Tensor {
     private final FloatBuffer data;
 
-    Tensor_float32(FloatBuffer data, long[] dims) {
-      super(dims);
+    Tensor_float32(FloatBuffer data, long[] shape) {
+      super(shape);
       this.data = data;
     }
 
@@ -288,16 +290,15 @@ public abstract class Tensor {
 
     @Override
     public String toString() {
-      return String.format(
-          "Tensor_float32{shape:%s capacity:%d}", Arrays.toString(shape), data.capacity());
+      return String.format("Tensor(%s, dtype=torch.float32)", Arrays.toString(shape));
     }
   }
 
   static class Tensor_long64 extends Tensor {
     private final LongBuffer data;
 
-    private Tensor_long64(LongBuffer data, long[] dims) {
-      super(dims);
+    private Tensor_long64(LongBuffer data, long[] shape) {
+      super(shape);
       this.data = data;
     }
 
@@ -321,8 +322,7 @@ public abstract class Tensor {
 
     @Override
     public String toString() {
-      return String.format(
-          "Tensor_long64{shape:%s numel:%d}", Arrays.toString(shape), data.capacity());
+      return String.format("Tensor(%s, dtype=torch.long)", Arrays.toString(shape));
     }
   }
 
@@ -354,8 +354,7 @@ public abstract class Tensor {
 
     @Override
     public String toString() {
-      return String.format(
-          "Tensor_double64{shape:%s numel:%d}", Arrays.toString(shape), data.capacity());
+      return String.format("Tensor(%s, dtype=torch.double)", Arrays.toString(shape));
     }
   }
 
@@ -374,14 +373,14 @@ public abstract class Tensor {
     }
   }
 
-  private static void checkShapeAndDataCapacityConsistency(int dataCapacity, long[] dims) {
-    final long numElements = numel(dims);
+  private static void checkShapeAndDataCapacityConsistency(int dataCapacity, long[] shape) {
+    final long numel = numel(shape);
     checkArgument(
-        numElements == dataCapacity,
-        "Inconsistent data capacity:%d and dims number elements:%d dims:%s",
+        numel == dataCapacity,
+        "Inconsistent data capacity:%d and shape number elements:%d shape:%s",
         dataCapacity,
-        numElements,
-        Arrays.toString(dims));
+        numel,
+        Arrays.toString(shape));
   }
   // endregion checks
 
