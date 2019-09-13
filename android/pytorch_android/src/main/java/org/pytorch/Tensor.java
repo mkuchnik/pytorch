@@ -8,6 +8,10 @@ import java.nio.IntBuffer;
 import java.util.Arrays;
 import java.util.Locale;
 
+/**
+ * Representation of Tensor, dimensions are stored in {@link Tensor#dims}, elements are stored as
+ * {@link java.nio.DirectByteBuffer} of one of the supported types: byte, int, float.
+ */
 public abstract class Tensor {
   private static final int TYPE_CODE_BYTE = 1;
   private static final int TYPE_CODE_INT32 = 2;
@@ -29,55 +33,107 @@ public abstract class Tensor {
   private static final int FLOAT_SIZE_BYTES = 4;
   private static final int INT_SIZE_BYTES = 4;
 
+  /**
+   * Allocates new direct {@link java.nio.FloatBuffer} with native byte order with specified
+   * capacity
+   * that can be used to in {@link Tensor#newFloatTensor(long[], FloatBuffer)}.
+   *
+   * @param numElements capacity (number of elements) of result buffer.
+   */
   public static FloatBuffer allocateFloatBuffer(int numElements) {
     return ByteBuffer.allocateDirect(numElements * FLOAT_SIZE_BYTES)
         .order(ByteOrder.nativeOrder())
         .asFloatBuffer();
   }
 
+  /**
+   * Allocates new direct {@link java.nio.IntBuffer} with native byte order with specified capacity
+   * that can be used to in {@link Tensor#newFloatTensor(long[], IntBuffer)}.
+   *
+   * @param numElements capacity (number of elements) of result buffer.
+   */
   public static IntBuffer allocateIntBuffer(int numElements) {
     return ByteBuffer.allocateDirect(numElements * INT_SIZE_BYTES)
         .order(ByteOrder.nativeOrder())
         .asIntBuffer();
   }
 
+  /**
+   * Allocates new direct {@link java.nio.ByteBuffer} with native byte order with specified capacity
+   * that can be used to in {@link Tensor#newFloatTensor(long[], ByteBuffer)}.
+   *
+   * @param numElements capacity (number of elements) of result buffer.
+   */
   public static ByteBuffer allocateByteBuffer(int numElements) {
     return ByteBuffer.allocateDirect(numElements).order(ByteOrder.nativeOrder());
   }
 
+  /**
+   * Creates new Tensor instance with elements type float and specified dimensions and data as
+   * java float array.
+   * Content of that java float array will be copied into newly allocated direct buffer
+   * {@link Tensor#allocateFloatBuffer(int)}.
+   *
+   * @param dims Tensor dimensions
+   * @param data Tensor elements.
+   */
   public static Tensor newFloatTensor(long[] dims, float[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(dims != null, ERROR_MSG_DIMS_NOT_NULL);
     checkDims(dims);
     checkDimsAndDataCapacityConsistency(data.length, dims);
-    final int bufferCapacity = (int) numElements(dims);
-    final FloatBuffer floatBuffer = allocateFloatBuffer(bufferCapacity);
+    final FloatBuffer floatBuffer = allocateFloatBuffer((int) numElements(dims));
     floatBuffer.put(data);
     return new Tensor_float32(floatBuffer, dims);
   }
 
+  /**
+   * Creates new Tensor instance with elements type float and specified dimensions and data as
+   * java int array.
+   * Content of that java int array will be copied into newly allocated direct buffer
+   * {@link Tensor#allocateIntBuffer(int)}.
+   *
+   * @param dims Tensor dimensions
+   * @param data Tensor elements.
+   */
   public static Tensor newIntTensor(long[] dims, int[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(dims != null, ERROR_MSG_DIMS_NOT_NULL);
     checkDims(dims);
     checkDimsAndDataCapacityConsistency(data.length, dims);
-    final int bufferCapacity = (int) numElements(dims);
-    final IntBuffer intBuffer = allocateIntBuffer(bufferCapacity);
+    final IntBuffer intBuffer = allocateIntBuffer((int) numElements(dims));
     intBuffer.put(data);
     return new Tensor_int32(intBuffer, dims);
   }
 
+  /**
+   * Creates new Tensor instance with elements type byte and specified dimensions and data as
+   * java byte array.
+   * Content of that java byte array will be copied into newly allocated direct buffer
+   * {@link Tensor#allocateByteBuffer(int)}.
+   *
+   * @param dims Tensor dimensions
+   * @param data Tensor elements.
+   */
   public static Tensor newByteTensor(long[] dims, byte[] data) {
     checkArgument(data != null, ERROR_MSG_DATA_ARRAY_NOT_NULL);
     checkArgument(dims != null, ERROR_MSG_DIMS_NOT_NULL);
     checkDims(dims);
     checkDimsAndDataCapacityConsistency(data.length, dims);
-    final int bufferCapacity = (int) numElements(dims);
-    final ByteBuffer byteBuffer = allocateByteBuffer(bufferCapacity);
+    final ByteBuffer byteBuffer = allocateByteBuffer((int) numElements(dims));
     byteBuffer.put(data);
     return new Tensor_byte(byteBuffer, dims);
   }
 
+  /**
+   * Creates new Tensor instance with elements type float and specified dimensions and data.
+   *
+   * @param dims Tensor dimensions, must be not negative.
+   * @param data Direct buffer with native byte order that contains corresponsing to dimensions
+   *             number of elements.
+   *             Specified buffer is used directly, could be used to change Tensor data.
+   * @return new Tensor object with specified dimensions and data.
+   */
   public static Tensor newFloatTensor(long[] dims, FloatBuffer data) {
     checkArgument(data != null, ERROR_MSG_DATA_BUFFER_NOT_NULL);
     checkArgument(dims != null, ERROR_MSG_DIMS_NOT_NULL);
@@ -90,6 +146,15 @@ public abstract class Tensor {
     return new Tensor_float32(data, dims);
   }
 
+  /**
+   * Creates new Tensor instance with elements type int and specified dimensions and data.
+   *
+   * @param dims Tensor dimensions, must be not negative.
+   * @param data Direct buffer with native byte order that contains corresponsing to dimensions
+   *             number of elements.
+   *             Specified buffer is used directly, could be used to change Tensor data.
+   * @return new Tensor object with specified dimensions and data.
+   */
   public static Tensor newIntTensor(long[] dims, IntBuffer data) {
     checkArgument(data != null, ERROR_MSG_DATA_BUFFER_NOT_NULL);
     checkArgument(dims != null, ERROR_MSG_DIMS_NOT_NULL);
@@ -102,6 +167,15 @@ public abstract class Tensor {
     return new Tensor_int32(data, dims);
   }
 
+  /**
+   * Creates new Tensor instance with elements type byte and specified dimensions and data.
+   *
+   * @param dims Tensor dimensions, must be not negative.
+   * @param data Direct buffer with native byte order that contains corresponsing to dimensions
+   *             number of elements.
+   *             Specified buffer is used directly, could be used to change Tensor data.
+   * @return new Tensor object with specified dimensions and data.
+   */
   public static Tensor newByteTensor(long[] dims, ByteBuffer data) {
     checkArgument(data != null, ERROR_MSG_DATA_BUFFER_NOT_NULL);
     checkArgument(dims != null, ERROR_MSG_DIMS_NOT_NULL);
@@ -119,6 +193,9 @@ public abstract class Tensor {
     this.dims = Arrays.copyOf(dims, dims.length);
   }
 
+  /**
+   * Calculates number of elements in tensor with specified dimensions.
+   */
   public static long numElements(long[] dims) {
     checkDims(dims);
     int result = 1;
@@ -128,29 +205,55 @@ public abstract class Tensor {
     return result;
   }
 
+  /**
+   * Returns newly allocated java byte array that contains copy of tensor data.
+   *
+   * @throws IllegalStateException if it is called for not byte tensor,
+   *                               {@link Tensor#isByteTensor()}
+   */
   public byte[] getDataAsByteArray() {
     throw new IllegalStateException(
         "Tensor of type " + getClass().getSimpleName() + " cannot return data as byte array.");
   }
 
+  /**
+   * Returns newly allocated java int array that contains copy of tensor data.
+   *
+   * @throws IllegalStateException if it is called for not int tensor, {@link Tensor#isIntTensor()}
+   */
   public int[] getDataAsIntArray() {
     throw new IllegalStateException(
         "Tensor of type " + getClass().getSimpleName() + " cannot return data as int array.");
   }
 
+  /**
+   * Returns newly allocated java float array that contains copy of tensor data.
+   *
+   * @throws IllegalStateException if it is called for not float tensor,
+   *                               {@link Tensor#isFloatTensor()}
+   */
   public float[] getDataAsFloatArray() {
     throw new IllegalStateException(
         "Tensor of type " + getClass().getSimpleName() + " cannot return data as float array.");
   }
 
+  /**
+   * @return true if current Tensor instance elements type is byte.
+   */
   public boolean isByteTensor() {
     return TYPE_CODE_BYTE == getTypeCode();
   }
 
+  /**
+   * @return true if current Tensor instance elements type is int.
+   */
   public boolean isIntTensor() {
     return TYPE_CODE_INT32 == getTypeCode();
   }
 
+  /**
+   * @return true if current Tensor instance elements type is float.
+   */
   public boolean isFloatTensor() {
     return TYPE_CODE_FLOAT32 == getTypeCode();
   }

@@ -3,6 +3,12 @@ package org.pytorch;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Java representation of torchscript variable which is implemented as tagged union that can be
+ * one of the supported types: https://pytorch.org/docs/stable/jit.html#types.
+ * <p>
+ * Calling getters for inappropriate type will throw IllegalStateException.
+ */
 public class IValue {
   private static final int TYPE_CODE_NULL = 1;
 
@@ -84,54 +90,83 @@ public class IValue {
     return new IValue(TYPE_CODE_NULL);
   }
 
+  /**
+   * Creates new IValue instance of torchscript Tensor type.
+   */
   public static IValue tensor(Tensor tensor) {
     final IValue iv = new IValue(TYPE_CODE_TENSOR);
     iv.mData = tensor;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript bool type.
+   */
   public static IValue bool(boolean value) {
     final IValue iv = new IValue(TYPE_CODE_BOOL);
     iv.mData = value;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript int type.
+   */
   public static IValue long64(long value) {
     final IValue iv = new IValue(TYPE_CODE_LONG);
     iv.mData = value;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript float type.
+   */
   public static IValue double64(double value) {
     final IValue iv = new IValue(TYPE_CODE_DOUBLE);
     iv.mData = value;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript List[bool] type.
+   */
   public static IValue boolList(boolean... list) {
     final IValue iv = new IValue(TYPE_CODE_BOOL_LIST);
     iv.mData = list;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript List[int] type.
+   */
   public static IValue longList(long... list) {
     final IValue iv = new IValue(TYPE_CODE_LONG_LIST);
     iv.mData = list;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript List[float] type.
+   */
   public static IValue doubleList(double... list) {
     final IValue iv = new IValue(TYPE_CODE_DOUBLE_LIST);
     iv.mData = list;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript List[Tensor] type.
+   */
   public static IValue tensorList(Tensor... list) {
     final IValue iv = new IValue(TYPE_CODE_TENSOR_LIST);
     iv.mData = list;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript List[T] type, all elements must have the same,
+   * throws
+   * exception in another case.
+   */
   public static IValue list(IValue... array) {
     final int size = array.length;
     if (size > 0) {
@@ -148,18 +183,27 @@ public class IValue {
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript Tuple[T0, T1, ...] type.
+   */
   public static IValue tuple(IValue... array) {
     final IValue iv = new IValue(TYPE_CODE_TUPLE);
     iv.mData = array;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance oftorchscript Dict[Str, V] type.
+   */
   public static IValue dictStringKey(Map<String, IValue> map) {
     final IValue iv = new IValue(TYPE_CODE_DICT_STRING_KEY);
     iv.mData = map;
     return iv;
   }
 
+  /**
+   * Creates new IValue instance of torchscript Dict[int, V] type.
+   */
   public static IValue dictLongKey(Map<Long, IValue> map) {
     final IValue iv = new IValue(TYPE_CODE_DICT_LONG_KEY);
     iv.mData = map;
