@@ -138,7 +138,9 @@ def collapseActualsTO(actuals):
            actuals.pop(index + 1)
            actuals.pop(index)
            actuals.insert(index, 'at::TensorOptions(options).is_variable(false)')
-
+    if 'options' in actuals:
+        index = actuals.index('options')
+        actuals[index] = 'options.is_variable(false)'
     return actuals
 
 def process_function(decl, is_tensor_option, disable_autograd):
@@ -162,15 +164,16 @@ def process_function(decl, is_tensor_option, disable_autograd):
         formals.append("{} {}{}".format(type, argument["name"], default))
         actual = argument["name"]
         actuals.append(actual)
-
-    if foo:
-        print("formals1: ", formals)
     formals = collapseFormalsTO(formals)
-    
-    if foo:
-        print("formals2: ", formals)
 
+    foo = decl['name'] == '_cudnn_init_dropout_state'
+    if foo:
+        print("\n\n\n\nNOW: ", actuals)
+        print('isTO: ', is_tensor_option)
     actuals = collapseActualsTO(actuals) # <-- can be removed?
+
+    if foo:
+        print("NOW2: ", actuals)
 
     requires_grad = "options.requires_grad()" if is_tensor_option else "false"
     if decl['name'].endswith('_like') and not is_tensor_option:
