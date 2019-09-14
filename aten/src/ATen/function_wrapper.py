@@ -1217,9 +1217,14 @@ def create_generic(top_env, declarations):
 
         a = any(arg['type'] == 'c10::optional<ScalarType>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<Layout>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<Device>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<bool>' for arg in option['arguments'])
         b = any(arg['type'] == 'c10::optional<at::ScalarType>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<at::Layout>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<at::Device>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<bool>' for arg in option['arguments'])
+        c = any('TensorOptions' in arg['type'] for arg in option['arguments'])
 
-
-        is_factory_method = a or b
+        is_factory_method = a or b or c
+        if type_method_dispatch == "randn":
+            print("\n\n\n hello")
+            print("type_method_dispatch : ", type_method_dispatch)
+            print("is_factory_method : ", is_factory_method)
+            print("args: ", option['arguments'])
 
         check_methods_do_not_start_with_underscore(option['name'], is_method)
 
@@ -1855,11 +1860,12 @@ def create_generic2(declarations):
         if is_method and not is_namespace_function:
             assert formals[0]['name'] == 'self'
 
+
         a = any(arg['type'] == 'c10::optional<ScalarType>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<Layout>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<Device>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<bool>' for arg in option['arguments'])
         b = any(arg['type'] == 'c10::optional<at::ScalarType>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<at::Layout>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<at::Device>' for arg in option['arguments']) and any(arg['type'] == 'c10::optional<bool>' for arg in option['arguments'])
 
-
-        is_factory_method = a or b
+        
+        is_factory_method = (a or b) and 'method' not in option['variants']
 
         check_methods_do_not_start_with_underscore(option['name'], is_method)
 
