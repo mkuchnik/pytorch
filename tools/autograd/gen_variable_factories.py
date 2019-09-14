@@ -7,6 +7,7 @@ import copy
 from .utils import CodeTemplate, write
 from .gen_variable_type import format_trace
 
+
 FUNCTION_TEMPLATE = CodeTemplate("""\
 inline at::Tensor ${name}(${formals}) {
   ${pre_record_trace}
@@ -25,13 +26,6 @@ inline at::Tensor ${name}(${formals}) {
 TYPE_PATTERN = re.compile(r"(?:const\s+)?([A-Z]\w+)")
 
 
-def fully_qualified_type(argument_type):
-    match = TYPE_PATTERN.match(argument_type)
-    if match is None:
-        return argument_type
-    index = match.start(1)
-    return "{}at::{}".format(argument_type[:index], argument_type[index:])
-
 def fix_c10_optional(type):
     if type == "c10::optional<ScalarType>":
         return "c10::optional<at::ScalarType>"
@@ -44,6 +38,14 @@ def fix_c10_optional(type):
 
     return type
 
+def fully_qualified_type(argument_type):
+    match = TYPE_PATTERN.match(argument_type)
+    if match is None:
+        return argument_type
+    index = match.start(1)
+    return "{}at::{}".format(argument_type[:index], argument_type[index:])
+
+
 def gen_variable_factories(out, declarations, template_path, disable_autograd=False):
     function_definitions = []
     for decl in declarations:
@@ -54,10 +56,10 @@ def gen_variable_factories(out, declarations, template_path, disable_autograd=Fa
         c1 = any(arg['type'] == 'const TensorOptions &' for arg in decl['arguments'])
         is_tensor_option = a or b or a1 or b1 or c1
 
-        #is_tensor_option = any(arg['type'] == 'c10::optional<ScalarType>' for arg in decl['arguments']) and any(arg['type'] == 'c10::optional<Layout>' for arg in decl['arguments']) and any(arg['type'] == 'c10::optional<Device>' for arg in decl['arguments']) and any(arg['type'] == 'c10::optional<bool>' for arg in decl['arguments'])
         is_namespace_fn = 'namespace' in decl['method_of']
         if (is_tensor_option or decl["name"].endswith("_like")) and is_namespace_fn:
-            function_definitions.append(process_function(decl, is_tensor_option, disable_autograd=disable_autograd))
+            function_definitions.append(
+                process_function(decl, is_tensor_option, disable_autograd=disable_autograd))
     write(out,
           "variable_factories.h",
           CodeTemplate.from_file(template_path + "/variable_factories.h"),
@@ -90,13 +92,6 @@ supported_topt_arguments.append(
          'default': 'c10::nullopt', 'is_nullable': True},
     ]
 )
-
-def check_topt_representation(topt_representation):
-    for idx, supported_topt in enumerate(supported_topt_arguments):
-        matches = all(topt_representation[i] == topt for i, topt in enumerate(supported_topt))
-        if matches:
-            return corresponding_topts[idx]
-    return None
 
 def is_tensor_option(argument):
     return argument['name'] in ['dtype', 'layout', 'device', 'pin_memory']
@@ -146,14 +141,15 @@ def collapseActualsTO(actuals):
 
     return actuals
 
-def process_function(decl, has_tensor_options, disable_autograd):
+def process_function(decl, is_tensor_option, disable_autograd):
+    foo = decl["name"].endswith("_like")
+    if foo:
+        print("\n\n", decl["name"])
     formals = []
     actuals = []
-
     for argument in decl["arguments"]:
         type = fully_qualified_type(argument["type"])
         type = fix_c10_optional(type)
-
         default = " = {}".format(argument["default"]) if "default" in argument else ""
         if (default != ""):
 
@@ -165,21 +161,26 @@ def process_function(decl, has_tensor_options, disable_autograd):
 
         formals.append("{} {}{}".format(type, argument["name"], default))
         actual = argument["name"]
-
         actuals.append(actual)
 
+    if foo:
+        print("formals1: ", formals)
     formals = collapseFormalsTO(formals)
+    
+    if foo:
+        print("formals2: ", formals)
+
     actuals = collapseActualsTO(actuals) # <-- can be removed?
 
     requires_grad = "options.requires_grad()" if is_tensor_option else "false"
     if decl['name'].endswith('_like') and not is_tensor_option:
         # it's a tensor
         actuals.append('{}.options().is_variable(false)'.format(actuals[0]))
-    elif 'options' in actuals:
-        actuals[actuals.index('options')] = 'at::TensorOptions(options).is_variable(false)'
 
     if not disable_autograd:
         pre_record_trace, post_record_trace = format_trace(decl)
+    elif 'options' in actuals:
+        actuals[actuals.index('options')] = 'at::TensorOptions(options).is_variable(false)'
     else:
         pre_record_trace, post_record_trace = '', ''
 

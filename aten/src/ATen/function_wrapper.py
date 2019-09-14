@@ -118,6 +118,7 @@ DEFAULT_FUNCTION_REGISTRATION = CodeTemplate("""\
   .impl_unboxedOnlyCatchAllKernel<${return_type} (${formals_types}), &TypeDefault::${api_name}>()
   .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
 """)
+
 BACKEND_FUNCTION_REGISTRATION = CodeTemplate("""\
 .op(torch::RegisterOperators::options()
   .schema("${schema_string}")
@@ -1747,70 +1748,81 @@ def create_generic2(declarations):
         def gen_tensor_method(option):
             # type: (Any) -> FunctionCode
             if isinstance(type_method_dispatch, dict):
-                mobile_function_switches = []
-                for backend in mobile_backends:
+                static_dispatch_function_switches = []
+                # NB: As this code is currently written, there will NEVER be
+                # a backend generated for variable dispatch.  There is nothing
+                # stopping us from actually implementing this, however, if you
+                # really wanted variable on mobile, there's nothing stopping
+                # you from implementing this (however, you would have an
+                # annoying phase problem, since code generation for variable
+                # happens in tools/ which happens later than here.)
+                #
+                # If you pass in a variable to the dispatch, and variable is
+                # enabled, this switch will fail.  This is intentional: you
+                # probably need to disable variable globally in the mobile
+                # calling code.
+                for backend in static_dispatch_backends:
                     if backend in type_method_dispatch:
-                        mobile_function_switches.append(MOBILE_FUNCTION_SWITCH_STATEMENT.substitute(
+                        static_dispatch_function_switches.append(STATIC_DISPATCH_FUNCTION_SWITCH_STATEMENT.substitute(
                             option,
                             backend=backend,
                             backend_function=type_method_dispatch[backend],
                             native_arguments=option['method_actuals']))
-                mobile_method_body = MOBILE_FUNCTION_SWITCH_BODY.substitute(
+                static_dispatch_method_body = STATIC_DISPATCH_FUNCTION_SWITCH_BODY.substitute(
                     option,
-                    backend='tensorTypeIdToBackend(type_id())',
-                    mobile_function_switches=mobile_function_switches)
+                    type_set='type_set()',
+                    static_dispatch_function_switches=static_dispatch_function_switches)
             else:
-                mobile_method_body = MOBILE_FUNCTION_DEFAULT_BODY.substitute(
+                static_dispatch_method_body = STATIC_DISPATCH_FUNCTION_DEFAULT_BODY.substitute(
                     option, native_arguments=option['method_actuals'])
 
             return FunctionCode(
-                declaration=TENSOR_METHOD_DECLARATION.substitute(option, mobile_method_body=mobile_method_body),
-                definition=TENSOR_METHOD_DEFINITION.substitute(option, mobile_method_body=mobile_method_body))
+                declaration=TENSOR_METHOD_DECLARATION.substitute(option, static_dispatch_method_body=static_dispatch_method_body),
+                definition=TENSOR_METHOD_DEFINITION.substitute(option, static_dispatch_method_body=static_dispatch_method_body))
 
         def gen_namespace_function(option, dispatch_tensor, dispatch_options):
             # type: (Any, Optional[str], Any) -> FunctionCode
             if dispatch_tensor:
-                option['inferred_backend'] = 'at::detail::infer_backend({})'.format(dispatch_tensor)
-                option['inferred_is_variable'] = 'at::detail::infer_is_variable({})'.format(dispatch_tensor)
+                option['inferred_type_set'] = 'at::detail::infer_tensor_type_set({})'.format(dispatch_tensor)
             elif dispatch_options:
-                option['inferred_backend'] = '{}.backend()'.format(dispatch_options['name'])
-                option['inferred_is_variable'] = '{}.is_variable()'.format(dispatch_options['name'])
+                option['inferred_type_set'] = '{}.type_set()'.format(dispatch_options['name'])
             else:
-                # doesn't depend on a specific backend, use CPU
-                option['inferred_backend'] = 'Backend::CPU'
-                option['inferred_is_variable'] = 'false'
+                # doesn't depend on a specific backend, use the empty set
+                # TODO: Does this actually work?
+                option['inferred_type_set'] = 'TensorTypeSet()'
             declaration = DEPRECATED_FUNCTION_DECLARATION if option['deprecated'] else FUNCTION_DECLARATION
             fn_declaration = declaration.substitute(option)
 
             if isinstance(type_method_dispatch, dict):
-                mobile_function_switches = []
-                for backend in mobile_backends:
+                static_dispatch_function_switches = []
+                for backend in static_dispatch_backends:
                     if backend in type_method_dispatch:
-                        mobile_function_switches.append(MOBILE_FUNCTION_SWITCH_STATEMENT.substitute(
+                        static_dispatch_function_switches.append(STATIC_DISPATCH_FUNCTION_SWITCH_STATEMENT.substitute(
                             option,
                             backend=backend,
                             backend_function=type_method_dispatch[backend],
                             native_arguments=option['native_actuals']))
-                mobile_function_body = MOBILE_FUNCTION_SWITCH_BODY.substitute(
+                static_dispatch_function_body = STATIC_DISPATCH_FUNCTION_SWITCH_BODY.substitute(
                     option,
-                    backend=option['inferred_backend'],
-                    mobile_function_switches=mobile_function_switches)
+                    type_set=option['inferred_type_set'],
+                    static_dispatch_function_switches=static_dispatch_function_switches)
             else:
-                mobile_function_body = MOBILE_FUNCTION_DEFAULT_BODY.substitute(
+                static_dispatch_function_body = STATIC_DISPATCH_FUNCTION_DEFAULT_BODY.substitute(
                     option, native_arguments=option['native_actuals'])
 
             if is_factory_method:
-                fn_definition = FACTORY_DEFINITION.substitute(option, mobile_function_body=mobile_function_body)
+                fn_definition = FACTORY_DEFINITION.substitute(option, static_dispatch_function_body=static_dispatch_function_body)
             else:
-                fn_definition = FUNCTION_DEFINITION.substitute(option, mobile_function_body=mobile_function_body)
+                fn_definition = FUNCTION_DEFINITION.substitute(option, static_dispatch_function_body=static_dispatch_function_body)
             return FunctionCode(definition=fn_definition, declaration=fn_declaration)
 
         # Emit #ifdef BUILD_NAMEDTENSOR macros for any code generated here
         # that is sent to top_env. This is because some of this code (Type.h,
-        # Tensor.h, TensorMethods.h) is checked into the repo and must be
+        # TensorBody.h, TensorMethods.h) is checked into the repo and must be
         # the same regardless of BUILD_NAMEDTENSOR status.
         is_named_tensor_only = (has_named_tensor_formals(formals) or
-                                option['api_name'] == 'align_tensors')
+                                option['api_name'] == 'align_tensors' or
+                                option['api_name'] == 'align_as')
 
         def check_namedtensor_enabled(code):
             if is_named_tensor_only:
@@ -1887,7 +1899,7 @@ def create_generic2(declarations):
                 if value not in generated_native_functions:
                     option['native_type_method_dispatch'] = value
                     generated_native_functions.append(value)
-
+     
         method_of = ['Type']
         if is_method:
             code = gen_tensor_method(option)
@@ -1905,7 +1917,9 @@ def create_generic2(declarations):
             return None
         return OutputDeclaration(
             name=option['api_name'],
+            operator_name=option['operator_name'],
             overload_name=option['overload_name'],
+            use_c10_dispatcher=option['use_c10_dispatcher'],
             matches_jit_signature=option["matches_jit_signature"],
             schema_string=option["schema_string"],
             method_prefix_derived=option['method_prefix_derived'],
