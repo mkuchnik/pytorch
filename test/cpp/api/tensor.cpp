@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <test/cpp/api/support.h>
 
 #include <torch/types.h>
 
@@ -321,8 +322,8 @@ TEST(TensorTest, Data) {
 }
 
 TEST(TensorTest, Backward_Grad_IsLeaf_OutputNr_Version) {
-  const auto x = torch::tensor({5}, at::TensorOptions().requires_grad(true));
-  const auto y = x * x;
+  auto x = torch::tensor({5}, at::TensorOptions().requires_grad(true));
+  auto y = x * x;
   y.backward();
   ASSERT_EQ(x.grad().item<float>(), 10.0);
   ASSERT_TRUE(x.is_leaf());
@@ -332,16 +333,16 @@ TEST(TensorTest, Backward_Grad_IsLeaf_OutputNr_Version) {
   ASSERT_EQ(x.version(), 0);
   ASSERT_EQ(y.version(), 0);
 
-  const auto x2 = at::tensor({5}, at::TensorOptions().requires_grad(false));
-  const auto y2 = x2 * x2;
-  ASSERT_THROW(y2.backward(), c10::Error);
-  ASSERT_THROW(x2.grad(), c10::Error);
-  ASSERT_THROW(x2.is_leaf(), c10::Error);
-  ASSERT_THROW(y2.is_leaf(), c10::Error);
-  ASSERT_THROW(x2.output_nr(), c10::Error);
-  ASSERT_THROW(y2.output_nr(), c10::Error);
-  ASSERT_THROW(x2.version(), c10::Error);
-  ASSERT_THROW(y2.version(), c10::Error);
+  x = at::tensor({5}, at::TensorOptions().requires_grad(false));
+  y = x * x;
+  ASSERT_THROW(y.backward(), c10::Error);
+  ASSERT_THROW(x.grad(), c10::Error);
+  ASSERT_THROW(x.is_leaf(), c10::Error);
+  ASSERT_THROW(y.is_leaf(), c10::Error);
+  ASSERT_THROW(x.output_nr(), c10::Error);
+  ASSERT_THROW(y.output_nr(), c10::Error);
+  ASSERT_THROW(x.version(), c10::Error);
+  ASSERT_THROW(y.version(), c10::Error);
 }
 
 TEST(TensorTest, BackwardCreatesOnesGrad) {
@@ -358,4 +359,28 @@ TEST(TensorTest, Version) {
   ASSERT_EQ(x.version(), 1);
   x.add_(1);
   ASSERT_EQ(x.version(), 2);
+}
+
+TEST(TensorTest, Requires_grad_) {
+  auto x = torch::tensor({5.0});
+  x.requires_grad_(true);
+  ASSERT_TRUE(x.requires_grad());
+
+  auto y = x * x;
+  ASSERT_THROWS_WITH(y.requires_grad_(false),
+    "you can only change requires_grad flags of leaf variables.");
+
+  x.requires_grad_(false);
+  ASSERT_FALSE(x.requires_grad());
+
+  const auto int_tensor = torch::tensor({5}, at::TensorOptions().dtype(torch::kInt));
+  ASSERT_THROWS_WITH(int_tensor.requires_grad_(true),
+    "Only Tensors of floating point dtype can require gradients");
+
+  x = at::tensor({5}, at::TensorOptions().requires_grad(false));
+  y = x * x;
+  ASSERT_THROWS_WITH(x.requires_grad_(false),
+    "requires_grad_ is not implemented for Tensor");
+  ASSERT_THROWS_WITH(y.requires_grad_(false),
+    "requires_grad_ is not implemented for Tensor");
 }
